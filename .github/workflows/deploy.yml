@@ -3,16 +3,18 @@ name: Deploy to ECS
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # 1️⃣ 코드 체크아웃
+      - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2️⃣ AWS 자격 증명 설정
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -20,10 +22,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
+      # 3️⃣ ECR 로그인
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # 4️⃣ Docker 이미지 빌드 및 푸시
       - name: Build and Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -33,18 +37,19 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # 5️⃣ 새 Task Definition 등록 (불필요 필드 제거)
       - name: Register new ECS Task Definition
         id: task-def
         run: |
-          TASK_DEF_JSON=$(aws ecs describe-task-definition \
+          aws ecs describe-task-definition \
             --task-definition ecs-test-task \
-            --query 'taskDefinition')
-          NEW_TASK_DEF=$(echo $TASK_DEF_JSON | jq \
-            '.containerDefinitions[0].image="693676067585.dkr.ecr.ap-northeast-2.amazonaws.com/ecs-test:latest"')
-          echo "$NEW_TASK_DEF" > new-task-def.json
-          aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json
+            --query 'taskDefinition' > task-def.json
 
+          cat task-def.json | jq 'del(.status, .taskDefinitionArn, .revision, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image="693676067585.dkr.ecr.ap-northeast-2.amazonaws.com/ecs-test:latest"' > new-task-def.json
+
+          aws ecs register-task-definition --cli-input-json file://new-task-def.json
+
+      # 6️⃣ ECS 서비스 업데이트 (무중단 배포)
       - name: Update ECS Service
         run: |
           aws ecs update-service \
