@@ -1,16 +1,16 @@
-name: Deploy to ECR
+name: Deploy to ECS
 
 on:
   push:
     branches:
-      - main  # master 브랜치에 push 될 때만 실행
+      - main
 
 jobs:
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
@@ -24,7 +24,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to ECR
+      - name: Build and Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ecs-test
@@ -32,3 +32,22 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Register new ECS Task Definition
+        id: task-def
+        run: |
+          TASK_DEF_JSON=$(aws ecs describe-task-definition \
+            --task-definition ecs-test-task \
+            --query 'taskDefinition')
+          NEW_TASK_DEF=$(echo $TASK_DEF_JSON | jq \
+            '.containerDefinitions[0].image="693676067585.dkr.ecr.ap-northeast-2.amazonaws.com/ecs-test:latest"')
+          echo "$NEW_TASK_DEF" > new-task-def.json
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json
+
+      - name: Update ECS Service
+        run: |
+          aws ecs update-service \
+            --cluster ecs-test-cluster \
+            --service ecs-test-service \
+            --force-new-deployment
