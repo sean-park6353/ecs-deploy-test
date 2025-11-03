@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 코드 체크아웃
+      # 1️⃣ 코드 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # AWS 자격 증명 설정
+      # 2️⃣ AWS 자격 증명 설정
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -22,12 +22,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      # ECR 로그인
+      # 3️⃣ ECR 로그인
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Docker 이미지 빌드 및 푸시
+      # 4️⃣ Docker 이미지 빌드 및 푸시
       - name: Build and Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -37,7 +37,7 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 새 Task Definition 등록
+      # 5️⃣ 새 Task Definition 등록
       - name: Register new ECS Task Definition
         id: task-def
         run: |
@@ -49,7 +49,7 @@ jobs:
 
           aws ecs register-task-definition --cli-input-json file://new-task-def.json
 
-      # ECS 서비스 업데이트 (무중단 배포)
+      # 6️⃣ ECS 서비스 업데이트 (무중단 배포)
       - name: Update ECS Service
         run: |
           aws ecs update-service \
