@@ -54,5 +54,5 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ecs-test-cluster \
-            --service ecs-test-service \
+            --service ecs-test-service-2 \
             --force-new-deployment
