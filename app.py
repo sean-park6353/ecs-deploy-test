@@ -2,6 +2,10 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 @app.get("/")
-def read_root():
-    return {"message": "드래곤볼"}
+def root():
+    return {"status": "ok"}
